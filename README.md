@@ -6,6 +6,8 @@ A simple Discord bot built with Node.js and `discord.js`.
 
 - Responds to `!ping` with the user's message latency.
 - Responds to `BTF bot does lawrence have aura` with a custom message.
+- Supports `/birthday add` to save a user's birthday and send a yearly birthday ping.
+- Supports `/birthday remove` to delete a saved birthday reminder.
 - Includes basic anti-spam detection and warning.
 
 ## Tech Stack
@@ -37,9 +39,10 @@ DISCORD_TOKEN=your_discord_bot_token_here
 4. Make sure your bot has these Privileged Gateway Intents enabled in the Discord Developer Portal:
 - Message Content Intent
 
-5. Invite the bot to your server with permissions to:
+5. Re-invite or refresh your bot permissions if needed, ensuring it can:
 - Read messages
 - Send messages
+- Use application commands (slash commands)
 
 6. Start the bot:
 
@@ -57,8 +60,21 @@ Logged in as <your_bot_name>
 
 - `!ping`
   - Replies with the user's latency (in milliseconds) from when the message was sent to when the bot processed it.
+- `/birthday add date:<YYYY-MM-DD>`
+  - Saves or updates your birthday.
+  - Each user can only have one saved birthday at a time.
+  - On that month/day each year, the bot posts: `Happy Birthday, @you` in the channel where you last set it.
+- `/birthday remove`
+  - Removes your currently saved birthday reminder.
 - `BTF bot does lawrence have aura`
   - Replies: `Yes, Lawrence has infinite aura!`
+
+## Birthday Notes
+
+- Date format must be `YYYY-MM-DD`.
+- Each user can only store one birthday at a time.
+- Birthdays are stored in a local `birthdays.json` file at the project root.
+- Birthday checks run every minute and use UTC date.
 
 ## Anti-Spam Behavior
 
@@ -76,6 +92,7 @@ Current defaults in the code:
 ├── index.js
 ├── package.json
 ├── package-lock.json
+├── birthdays.json (auto-created when first birthday is added)
 ├── .env
 ├── .gitignore
 └── README.md
