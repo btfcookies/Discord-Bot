@@ -94,7 +94,11 @@ async function registerSlashCommands() {
         .setDescription('Remove your saved birthday reminder')
     );
 
-  await client.application.commands.set([birthdayCommand]);
+  const aurafarmCommand = new SlashCommandBuilder()
+    .setName('aurafarm')
+    .setDescription('Check your aura');
+
+  await client.application.commands.set([birthdayCommand, aurafarmCommand]);
 }
 
 async function checkBirthdaysAndSend() {
@@ -164,6 +168,11 @@ client.once('ready', () => {
 
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
+
+  if (interaction.commandName === 'aurafarm') {
+    await interaction.reply(`${interaction.user.username} has aura`);
+    return;
+  }
 
   if (interaction.commandName !== 'birthday') return;
   if (!interaction.inGuild()) {
