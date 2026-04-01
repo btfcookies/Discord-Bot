@@ -35,6 +35,7 @@ const client = new Client({
 const userMessages = new Map();
 
 const BIRTHDAYS_FILE = path.join(__dirname, 'birthdays.json');
+const AURA_FILE = path.join(__dirname, 'aura.json');
 
 const BIRTHDAY_INFO_PAGES = [
   {
@@ -58,6 +59,8 @@ const BIRTHDAY_INFO_PAGES = [
     details: 'Shows this paginator with details for each available birthday command.',
   },
 ];
+
+const AURA_LEADERBOARD_PAGE_SIZE = 5;
 
 function buildInfoPage(pageIndex) {
   const page = BIRTHDAY_INFO_PAGES[pageIndex];
@@ -109,6 +112,89 @@ function loadBirthdays() {
     console.error('Failed to read birthdays file:', error);
     return [];
   }
+}
+
+function loadAura() {
+  if (!fs.existsSync(AURA_FILE)) {
+    return [];
+  }
+
+  try {
+    const raw = fs.readFileSync(AURA_FILE, 'utf8');
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.error('Failed to read aura file:', error);
+    return [];
+  }
+}
+
+function saveAura(aura) {
+  try {
+    fs.writeFileSync(AURA_FILE, JSON.stringify(aura, null, 2), 'utf8');
+  } catch (error) {
+    console.error('Failed to save aura file:', error);
+  }
+}
+
+function getSortedAuraEntries() {
+  return loadAura()
+    .filter(
+      (entry) =>
+        entry &&
+        typeof entry.userId === 'string' &&
+        Number.isInteger(entry.Aura) &&
+        entry.Aura >= 0
+    )
+    .sort((a, b) => b.Aura - a.Aura);
+}
+
+function buildAuraLeaderboardPage(pageIndex) {
+  const sortedAura = getSortedAuraEntries();
+  const totalPages = Math.max(1, Math.ceil(sortedAura.length / AURA_LEADERBOARD_PAGE_SIZE));
+  const safePageIndex = Math.min(Math.max(pageIndex, 0), totalPages - 1);
+  const start = safePageIndex * AURA_LEADERBOARD_PAGE_SIZE;
+  const end = start + AURA_LEADERBOARD_PAGE_SIZE;
+  const pageEntries = sortedAura.slice(start, end);
+
+  const lines =
+    pageEntries.length > 0
+      ? pageEntries
+          .map((entry, idx) => {
+            const rank = start + idx + 1;
+            return `${rank}. <@${entry.userId}> - ${entry.Aura} Aura`;
+          })
+          .join('\n')
+      : 'No aura has been farmed yet.';
+
+  const embed = new EmbedBuilder()
+    .setColor(0xf1c40f)
+    .setTitle('Aura Leaderboard')
+    .setDescription(lines)
+    .setFooter({ text: `Page ${safePageIndex + 1} of ${totalPages}` });
+
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`aura_lb_prev_${safePageIndex}`)
+      .setLabel('◀ Previous')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(safePageIndex === 0),
+    new ButtonBuilder()
+      .setCustomId('aura_lb_page_indicator')
+      .setLabel(`${safePageIndex + 1}/${totalPages}`)
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(true),
+    new ButtonBuilder()
+      .setCustomId(`aura_lb_next_${safePageIndex}`)
+      .setLabel('Next ▶')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(safePageIndex === totalPages - 1)
+  );
+
+  return {
+    embeds: [embed],
+    components: [row],
+  };
 }
 
 function saveBirthdays(birthdays) {
@@ -164,11 +250,17 @@ async function registerSlashCommands() {
         .setDescription('View info and descriptions for all birthday subcommands')
     );
 
-  const aurafarmCommand = new SlashCommandBuilder()
-    .setName('aurafarm')
-    .setDescription('Check your aura');
+  const auraCommand = new SlashCommandBuilder()
+    .setName('aura')
+    .setDescription('Aura commands')
+    .addSubcommand((subcommand) =>
+      subcommand.setName('farm').setDescription('Farm a random amount of aura (1-5)')
+    )
+    .addSubcommand((subcommand) =>
+      subcommand.setName('leaderboard').setDescription('Show the aura leaderboard')
+    );
 
-  await client.application.commands.set([birthdayCommand, aurafarmCommand]);
+  await client.application.commands.set([birthdayCommand, auraCommand]);
 }
 
 async function checkBirthdaysAndSend() {
@@ -240,6 +332,8 @@ client.on('interactionCreate', async (interaction) => {
   if (interaction.isButton()) {
     const prevMatch = /^birthday_info_prev_(\d+)$/.exec(interaction.customId);
     const nextMatch = /^birthday_info_next_(\d+)$/.exec(interaction.customId);
+    const auraPrevMatch = /^aura_lb_prev_(\d+)$/.exec(interaction.customId);
+    const auraNextMatch = /^aura_lb_next_(\d+)$/.exec(interaction.customId);
 
     if (prevMatch) {
       const newPage = Number(prevMatch[1]) - 1;
@@ -253,13 +347,48 @@ client.on('interactionCreate', async (interaction) => {
       return;
     }
 
+    if (auraPrevMatch) {
+      const newPage = Number(auraPrevMatch[1]) - 1;
+      await interaction.update(buildAuraLeaderboardPage(newPage));
+      return;
+    }
+
+    if (auraNextMatch) {
+      const newPage = Number(auraNextMatch[1]) + 1;
+      await interaction.update(buildAuraLeaderboardPage(newPage));
+      return;
+    }
+
     return;
   }
 
   if (!interaction.isChatInputCommand()) return;
 
-  if (interaction.commandName === 'aurafarm') {
-    await interaction.reply(`${interaction.user.username} has aura`);
+  if (interaction.commandName === 'aura') {
+    const subcommand = interaction.options.getSubcommand();
+
+    if (subcommand === 'farm') {
+      const gainedAmount = Math.floor(Math.random() * 5) + 1;
+      const aura = loadAura();
+      const existingEntry = aura.find((entry) => entry.userId === interaction.user.id);
+
+      if (existingEntry) {
+        existingEntry.Aura += gainedAmount;
+      } else {
+        aura.push({ userId: interaction.user.id, Aura: gainedAmount });
+      }
+
+      saveAura(aura);
+
+      await interaction.reply(`<@${interaction.user.id}> gained ${gainedAmount} aura`);
+      return;
+    }
+
+    if (subcommand === 'leaderboard') {
+      await interaction.reply(buildAuraLeaderboardPage(0));
+      return;
+    }
+
     return;
   }
 

@@ -8,6 +8,8 @@ A simple Discord bot built with Node.js and `discord.js`.
 - Responds to `BTF bot does lawrence have aura` with a custom message.
 - Supports `/birthday add` to save a user's birthday and send a yearly birthday ping.
 - Supports `/birthday remove` to delete a saved birthday reminder.
+- Supports `/aura farm` to gain a random amount of Aura.
+- Supports `/aura leaderboard` with paginator buttons.
 - Includes basic anti-spam detection and warning.
 
 ## Tech Stack
@@ -66,6 +68,12 @@ Logged in as <your_bot_name>
   - On that month/day each year, the bot posts: `Happy Birthday, @you` in the channel where you last set it.
 - `/birthday remove`
   - Removes your currently saved birthday reminder.
+- `/aura farm`
+  - Grants a random amount of Aura between 1 and 5.
+  - Replies publicly with: `<username> gained <amount> aura`.
+- `/aura leaderboard`
+  - Shows users ranked by total Aura.
+  - Displays 5 users per page with Previous/Next buttons.
 - `BTF bot does lawrence have aura`
   - Replies: `Yes, Lawrence has infinite aura!`
 
