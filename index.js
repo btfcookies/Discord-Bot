@@ -17,6 +17,7 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  EmbedBuilder,
 } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
@@ -37,30 +38,51 @@ const BIRTHDAYS_FILE = path.join(__dirname, 'birthdays.json');
 
 const BIRTHDAY_INFO_PAGES = [
   {
-    title: '📖 Birthday Commands — Page 1/3',
-    description:
-      '`/birthday add <date>`\nSave or update your birthday reminder.\nProvide your birthday in `YYYY-MM-DD` format and the bot will wish you a happy birthday every year in the channel you used the command in.',
+    title: 'Birthday Commands',
+    command: '/birthday add <date>',
+    summary: 'Save or update your birthday reminder.',
+    details:
+      'Use `YYYY-MM-DD`. The bot will wish you a happy birthday every year in the channel where you ran the command.',
   },
   {
-    title: '📖 Birthday Commands — Page 2/3',
-    description:
-      '`/birthday remove`\nRemove your saved birthday reminder.\nIf you have a birthday saved, this will delete it so the bot will no longer send you birthday messages.',
+    title: 'Birthday Commands',
+    command: '/birthday remove',
+    summary: 'Remove your saved birthday reminder.',
+    details:
+      'Deletes your saved birthday so the bot will no longer send birthday messages for you.',
   },
   {
-    title: '📖 Birthday Commands — Page 3/3',
-    description:
-      '`/birthday info`\nDisplay information about all birthday subcommands.\nShows you this paginated help menu detailing each available subcommand.',
+    title: 'Birthday Commands',
+    command: '/birthday info',
+    summary: 'Display information about all birthday subcommands.',
+    details: 'Shows this paginator with details for each available birthday command.',
   },
 ];
 
 function buildInfoPage(pageIndex) {
   const page = BIRTHDAY_INFO_PAGES[pageIndex];
+
+  const embed = new EmbedBuilder()
+    .setColor(0x00fff7)
+    .setTitle(`📖 ${page.title}`)
+    .addFields(
+      { name: 'Command', value: `\`${page.command}\``, inline: false },
+      { name: 'Summary', value: page.summary, inline: false },
+      { name: 'Details', value: page.details, inline: false }
+    )
+    .setFooter({ text: `Page ${pageIndex + 1} of ${BIRTHDAY_INFO_PAGES.length}` });
+
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`birthday_info_prev_${pageIndex}`)
       .setLabel('◀ Previous')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(pageIndex === 0),
+    new ButtonBuilder()
+      .setCustomId('birthday_info_page_indicator')
+      .setLabel(`${pageIndex + 1}/${BIRTHDAY_INFO_PAGES.length}`)
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(true),
     new ButtonBuilder()
       .setCustomId(`birthday_info_next_${pageIndex}`)
       .setLabel('Next ▶')
@@ -69,9 +91,8 @@ function buildInfoPage(pageIndex) {
   );
 
   return {
-    content: `**${page.title}**\n\n${page.description}`,
+    embeds: [embed],
     components: [row],
-    ephemeral: true,
   };
 }
 
@@ -99,7 +120,7 @@ function saveBirthdays(birthdays) {
 }
 
 function parseBirthdayDate(input) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(input);
+  const match = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(input);
   if (!match) return null;
 
   const year = Number(match[1]);
@@ -231,6 +252,8 @@ client.on('interactionCreate', async (interaction) => {
       await interaction.update(buildInfoPage(newPage));
       return;
     }
+
+    return;
   }
 
   if (!interaction.isChatInputCommand()) return;
