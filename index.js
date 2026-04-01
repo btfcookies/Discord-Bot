@@ -260,7 +260,11 @@ async function registerSlashCommands() {
       subcommand.setName('leaderboard').setDescription('Show the aura leaderboard')
     );
 
-  await client.application.commands.set([birthdayCommand, auraCommand]);
+  const pingCommand = new SlashCommandBuilder()
+    .setName('ping')
+    .setDescription('Check the bot\'s latency');
+
+  await client.application.commands.set([birthdayCommand, auraCommand, pingCommand]);
 }
 
 async function checkBirthdaysAndSend() {
@@ -363,6 +367,12 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   if (!interaction.isChatInputCommand()) return;
+
+  if (interaction.commandName === 'ping') {
+    const latency = Date.now() - interaction.createdTimestamp;
+    await interaction.reply(`Pong! Latency is ${latency}ms.`);
+    return;
+  }
 
   if (interaction.commandName === 'aura') {
     const subcommand = interaction.options.getSubcommand();
@@ -478,11 +488,6 @@ client.on('messageCreate', (message) => {
   }
 
   // --- Existing Commands ---
-  if (message.content === '!ping') {
-    const latency = Date.now() - message.createdTimestamp;
-    message.reply(`Pong! Your latency is ${latency}ms.`);
-  }
-
   if (message.content === 'BTF bot does lawrence have aura') {
     message.reply('Yes, Lawrence has infinite aura!');
   }
