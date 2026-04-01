@@ -10,8 +10,14 @@ app.listen(3000, () => {
 });
 
 require('dotenv').config();
-const { Client, GatewayIntentBits } = require('discord.js');
-const { SlashCommandBuilder } = require('discord.js');
+const {
+  Client,
+  GatewayIntentBits,
+  SlashCommandBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+} = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 
@@ -28,6 +34,46 @@ const client = new Client({
 const userMessages = new Map();
 
 const BIRTHDAYS_FILE = path.join(__dirname, 'birthdays.json');
+
+const BIRTHDAY_INFO_PAGES = [
+  {
+    title: '📖 Birthday Commands — Page 1/3',
+    description:
+      '`/birthday add <date>`\nSave or update your birthday reminder.\nProvide your birthday in `YYYY-MM-DD` format and the bot will wish you a happy birthday every year in the channel you used the command in.',
+  },
+  {
+    title: '📖 Birthday Commands — Page 2/3',
+    description:
+      '`/birthday remove`\nRemove your saved birthday reminder.\nIf you have a birthday saved, this will delete it so the bot will no longer send you birthday messages.',
+  },
+  {
+    title: '📖 Birthday Commands — Page 3/3',
+    description:
+      '`/birthday info`\nDisplay information about all birthday subcommands.\nShows you this paginated help menu detailing each available subcommand.',
+  },
+];
+
+function buildInfoPage(pageIndex) {
+  const page = BIRTHDAY_INFO_PAGES[pageIndex];
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`birthday_info_prev_${pageIndex}`)
+      .setLabel('◀ Previous')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(pageIndex === 0),
+    new ButtonBuilder()
+      .setCustomId(`birthday_info_next_${pageIndex}`)
+      .setLabel('Next ▶')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(pageIndex === BIRTHDAY_INFO_PAGES.length - 1)
+  );
+
+  return {
+    content: `**${page.title}**\n\n${page.description}`,
+    components: [row],
+    ephemeral: true,
+  };
+}
 
 function loadBirthdays() {
   if (!fs.existsSync(BIRTHDAYS_FILE)) {
@@ -89,9 +135,12 @@ async function registerSlashCommands() {
         )
     )
     .addSubcommand((subcommand) =>
+      subcommand.setName('remove').setDescription('Remove your saved birthday reminder')
+    )
+    .addSubcommand((subcommand) =>
       subcommand
-        .setName('remove')
-        .setDescription('Remove your saved birthday reminder')
+        .setName('info')
+        .setDescription('View info and descriptions for all birthday subcommands')
     );
 
   const aurafarmCommand = new SlashCommandBuilder()
@@ -167,6 +216,23 @@ client.once('ready', () => {
 });
 
 client.on('interactionCreate', async (interaction) => {
+  if (interaction.isButton()) {
+    const prevMatch = /^birthday_info_prev_(\d+)$/.exec(interaction.customId);
+    const nextMatch = /^birthday_info_next_(\d+)$/.exec(interaction.customId);
+
+    if (prevMatch) {
+      const newPage = Number(prevMatch[1]) - 1;
+      await interaction.update(buildInfoPage(newPage));
+      return;
+    }
+
+    if (nextMatch) {
+      const newPage = Number(nextMatch[1]) + 1;
+      await interaction.update(buildInfoPage(newPage));
+      return;
+    }
+  }
+
   if (!interaction.isChatInputCommand()) return;
 
   if (interaction.commandName === 'aurafarm') {
@@ -184,6 +250,11 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   const subcommand = interaction.options.getSubcommand();
+
+  if (subcommand === 'info') {
+    await interaction.reply(buildInfoPage(0));
+    return;
+  }
 
   if (subcommand === 'remove') {
     const birthdays = loadBirthdays();
@@ -231,7 +302,6 @@ client.on('interactionCreate', async (interaction) => {
   };
 
   birthdays.push(birthdayEntry);
-
   saveBirthdays(birthdays);
 
   await interaction.reply({
@@ -241,18 +311,16 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 client.on('messageCreate', (message) => {
-  if (message.author.bot) return; // Ignore bots
+  if (message.author.bot) return;
 
   // --- Anti-Spam Logic ---
   const now = Date.now();
   const timestamps = userMessages.get(message.author.id) || [];
   timestamps.push(now);
 
-  // Keep only messages within the interval
   const recent = timestamps.filter((time) => now - time <= SPAM_INTERVAL);
   userMessages.set(message.author.id, recent);
 
-  // If exceeded limit, warn user
   if (recent.length > SPAM_LIMIT) {
     message.reply('Hey stop spamming').catch(console.error);
   }
