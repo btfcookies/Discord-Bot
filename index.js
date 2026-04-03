@@ -254,6 +254,24 @@ async function registerSlashCommands() {
     .setName('aura')
     .setDescription('Aura commands')
     .addSubcommand((subcommand) =>
+      subcommand
+        .setName('add')
+        .setDescription('Add aura to yourself or another user')
+        .addIntegerOption((option) =>
+          option
+            .setName('amount')
+            .setDescription('Amount of aura to add (minimum 1)')
+            .setRequired(true)
+            .setMinValue(1)
+        )
+        .addUserOption((option) =>
+          option
+            .setName('username')
+            .setDescription('Optional: user to add aura to')
+            .setRequired(false)
+        )
+    )
+    .addSubcommand((subcommand) =>
       subcommand.setName('farm').setDescription('Farm a random amount of aura (1-5)')
     )
     .addSubcommand((subcommand) =>
@@ -319,6 +337,7 @@ async function checkBirthdaysAndSend() {
 // Anti-spam settings
 const SPAM_INTERVAL = 3000; // 3 seconds
 const SPAM_LIMIT = 3; // messages allowed in interval
+const AURA_ADD_REQUIRED_ROLE_NAME = '👑COOKIEMONSTER👑';
 
 client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}`);
@@ -387,6 +406,53 @@ client.on('interactionCreate', async (interaction) => {
 
   if (interaction.commandName === 'aura') {
     const subcommand = interaction.options.getSubcommand();
+
+    if (subcommand === 'add') {
+      if (!interaction.inGuild()) {
+        await interaction.reply({
+          content: 'This command can only be used in a server.',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const member = await interaction.guild.members.fetch(interaction.user.id);
+      const hasRequiredRole = member.roles.cache.some(
+        (role) => role.name === AURA_ADD_REQUIRED_ROLE_NAME
+      );
+
+      if (!hasRequiredRole) {
+        await interaction.reply({
+          content: `You need the ${AURA_ADD_REQUIRED_ROLE_NAME} role to use /aura add.`,
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const amount = interaction.options.getInteger('amount', true);
+      const targetUser = interaction.options.getUser('username') || interaction.user;
+      const aura = loadAura();
+      const targetEntry = aura.find((entry) => entry.userId === targetUser.id);
+
+      if (targetEntry) {
+        targetEntry.Aura += amount;
+      } else {
+        aura.push({ userId: targetUser.id, Aura: amount });
+      }
+
+      saveAura(aura);
+
+      const updatedEntry = aura.find((entry) => entry.userId === targetUser.id);
+      const totalAura = updatedEntry ? updatedEntry.Aura : amount;
+
+      await interaction.reply(
+        {
+          content: `<@${interaction.user.id}> added ${amount} aura to <@${targetUser.id}>. Total Aura: ${totalAura}`,
+          ephemeral: true,
+        }
+      );
+      return;
+    }
 
     if (subcommand === 'farm') {
       const gainedAmount = Math.floor(Math.random() * 5) + 1;
