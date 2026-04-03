@@ -257,6 +257,17 @@ async function registerSlashCommands() {
       subcommand.setName('farm').setDescription('Farm a random amount of aura (1-5)')
     )
     .addSubcommand((subcommand) =>
+      subcommand
+        .setName('loss')
+        .setDescription('Try to make another user lose 1-5 aura')
+        .addUserOption((option) =>
+          option
+            .setName('username')
+            .setDescription('The user to make lose aura')
+            .setRequired(true)
+        )
+    )
+    .addSubcommand((subcommand) =>
       subcommand.setName('leaderboard').setDescription('Show the aura leaderboard')
     );
 
@@ -391,6 +402,56 @@ client.on('interactionCreate', async (interaction) => {
       saveAura(aura);
 
       await interaction.reply(`<@${interaction.user.id}> gained ${gainedAmount} aura`);
+      return;
+    }
+
+    if (subcommand === 'loss') {
+      const LOSS_METHODS = [
+        'leaking their search history',
+        'not letting them buy btf',
+        'making them say 67',
+      ];
+
+      const targetUser = interaction.options.getUser('username', true);
+      const aura = loadAura();
+      const commandSucceeded = Math.floor(Math.random() * 5) === 0;
+
+      if (commandSucceeded) {
+        const lossAmount = Math.floor(Math.random() * 5) + 1;
+        const lossMethod = LOSS_METHODS[Math.floor(Math.random() * LOSS_METHODS.length)];
+        const targetEntry = aura.find((entry) => entry.userId === targetUser.id);
+
+        if (targetEntry) {
+          targetEntry.Aura = Math.max(0, targetEntry.Aura - lossAmount);
+        } else {
+          aura.push({ userId: targetUser.id, Aura: 0 });
+        }
+
+        saveAura(aura);
+
+        await interaction.reply(
+          `<@${interaction.user.id}> made <@${targetUser.id}> lose ${lossAmount} aura by ${lossMethod}`
+        );
+        return;
+      }
+
+      const issuerEntry = aura.find((entry) => entry.userId === interaction.user.id);
+      let message = `<@${interaction.user.id}> tried to make <@${targetUser.id}> lose aura, but failed.`;
+
+      if (Math.floor(Math.random() * 2) === 0) {
+        const issuerLossAmount = Math.floor(Math.random() * 5) + 1;
+
+        if (issuerEntry) {
+          issuerEntry.Aura = Math.max(0, issuerEntry.Aura - issuerLossAmount);
+        } else {
+          aura.push({ userId: interaction.user.id, Aura: 0 });
+        }
+
+        message += ` <@${interaction.user.id}> lost ${issuerLossAmount} aura because they failed.`;
+      }
+
+      saveAura(aura);
+      await interaction.reply(message);
       return;
     }
 

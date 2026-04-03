@@ -10,6 +10,7 @@ A simple Discord bot built with Node.js and `discord.js`.
 - Supports `/birthday remove` to delete a saved birthday reminder.
 - Supports `/birthday info` to show birthday command help with paginator buttons.
 - Supports `/aura farm` to gain a random amount of Aura.
+- Supports `/aura loss` to try making another user lose Aura.
 - Supports `/aura leaderboard` with paginator buttons.
 - Includes basic anti-spam detection and warning.
 
@@ -74,6 +75,9 @@ Logged in as <your_bot_name>
 - `/aura farm`
   - Grants a random amount of Aura between 1 and 5.
   - Replies publicly with: `<username> gained <amount> aura`.
+- `/aura loss username:<@user>`
+  - Has a 1 in 5 chance to make the target lose 1 to 5 Aura.
+  - If it fails, there is a 50% chance the command user loses 1 to 5 Aura instead.
 - `/aura leaderboard`
   - Shows users ranked by total Aura.
   - Displays 5 users per page with Previous/Next buttons.
