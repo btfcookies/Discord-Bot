@@ -293,7 +293,17 @@ async function registerSlashCommands() {
     .setName('ping')
     .setDescription('Check the bot\'s latency');
 
-  await client.application.commands.set([birthdayCommand, auraCommand, pingCommand]);
+  const hellnoCommand = new SlashCommandBuilder()
+    .setName('hellno')
+    .setDescription('Tell someone hell no')
+    .addUserOption((option) =>
+      option
+        .setName('user')
+        .setDescription('The user to say hell no to')
+        .setRequired(true)
+    );
+
+  await client.application.commands.set([birthdayCommand, auraCommand, pingCommand, hellnoCommand]);
 }
 
 async function checkBirthdaysAndSend() {
@@ -401,6 +411,12 @@ client.on('interactionCreate', async (interaction) => {
   if (interaction.commandName === 'ping') {
     const latency = Date.now() - interaction.createdTimestamp;
     await interaction.reply(`Pong! Latency is ${latency}ms.`);
+    return;
+  }
+
+  if (interaction.commandName === 'hellno') {
+    const targetUser = interaction.options.getUser('user', true);
+    await interaction.reply(`<@${targetUser.id}> - hell no`);
     return;
   }
 
