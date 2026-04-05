@@ -509,7 +509,7 @@ client.once('ready', () => {
             .then(() => {
               console.log('Startup message sent.');
             })
-            .catch((error) => {
+            .catch((error) => { 
               console.error('Failed to send startup message:', error);
             });
         } else {
