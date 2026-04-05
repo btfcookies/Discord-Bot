@@ -303,7 +303,23 @@ async function registerSlashCommands() {
         .setRequired(true)
     );
 
-  await client.application.commands.set([birthdayCommand, auraCommand, pingCommand, hellnoCommand]);
+  const whoaskedCommand = new SlashCommandBuilder()
+    .setName('whoasked')
+    .setDescription('Ask who asked')
+    .addUserOption((option) =>
+      option
+        .setName('user')
+        .setDescription('The user to ask who asked')
+        .setRequired(true)
+    );
+
+  await client.application.commands.set([
+    birthdayCommand,
+    auraCommand,
+    pingCommand,
+    hellnoCommand,
+    whoaskedCommand,
+  ]);
 }
 
 async function checkBirthdaysAndSend() {
@@ -417,6 +433,12 @@ client.on('interactionCreate', async (interaction) => {
   if (interaction.commandName === 'hellno') {
     const targetUser = interaction.options.getUser('user', true);
     await interaction.reply(`<@${targetUser.id}> - hell no`);
+    return;
+  }
+
+  if (interaction.commandName === 'whoasked') {
+    const targetUser = interaction.options.getUser('user', true);
+    await interaction.reply(`<@${targetUser.id}> - who asked?`);
     return;
   }
 

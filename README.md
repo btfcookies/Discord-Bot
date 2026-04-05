@@ -81,6 +81,8 @@ Logged in as <your_bot_name>
 - `/aura leaderboard`
   - Shows users ranked by total Aura.
   - Displays 5 users per page with Previous/Next buttons.
+- `/whoasked user:<@user>`
+  - Replies with: `@user - who asked?`
 - `BTF bot does lawrence have aura`
   - Replies: `Yes, Lawrence has infinite aura!`
 
