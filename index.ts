@@ -498,6 +498,29 @@ client.once('ready', () => {
       console.error('Failed to register slash commands:', error);
     });
 
+  // Send startup message
+  const channelId = '1490417449831501914';
+  client.channels.fetch(channelId)
+    .then((channel) => {
+      if (channel && channel.isTextBased() && !channel.isDMBased()) {
+        const botPingRole = channel.guild.roles.cache.find(role => role.name === 'bot ping');
+        if (botPingRole) {
+          channel.send(`<@&${botPingRole.id}> i have awaken <t:${Math.floor(Date.now() / 1000)}:F>`)
+            .then(() => {
+              console.log('Startup message sent.');
+            })
+            .catch((error) => {
+              console.error('Failed to send startup message:', error);
+            });
+        } else {
+          console.error('Bot ping role not found');
+        }
+      }
+    })
+    .catch((error) => {
+      console.error('Failed to fetch startup channel:', error);
+    });
+
   // Check once at startup, then every minute.
   checkBirthdaysAndSend().catch((error) => {
     console.error('Birthday check failed:', error);
@@ -657,7 +680,7 @@ client.on('interactionCreate', async (interaction) => {
 
       const targetUser = interaction.options.getUser('username', true);
       const aura = loadAura();
-      const commandSucceeded = Math.floor(Math.random() * 5) === 0;
+      const commandSucceeded = Math.floor(Math.random() * 4) === 0;
 
       if (commandSucceeded) {
         const lossAmount = Math.floor(Math.random() * 5) + 1;
