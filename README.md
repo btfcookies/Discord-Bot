@@ -84,6 +84,8 @@ Logged in as <your_bot_name>
   - Displays 5 users per page with Previous/Next buttons.
 - `/whoasked user:<@user>`
   - Replies with: `@user - who asked?`
+- `/info`
+  - Shows a paginator with every slash command and each command's subcommands.
 - `BTF bot does lawrence have aura`
   - Replies: `Yes, Lawrence has infinite aura!`
 

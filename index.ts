@@ -31,6 +31,13 @@ interface BirthdayInfoPage {
   details: string;
 }
 
+interface GeneralInfoPage {
+  title: string;
+  command: string;
+  summary: string;
+  subcommands: string[];
+}
+
 interface BirthdayEntry {
   userId: string;
   guildId: string;
@@ -90,6 +97,45 @@ const BIRTHDAY_INFO_PAGES: BirthdayInfoPage[] = [
   },
 ];
 
+const GENERAL_INFO_PAGES: GeneralInfoPage[] = [
+  {
+    title: 'General Command Info',
+    command: '/birthday',
+    summary: 'Manage birthday reminders.',
+    subcommands: ['/birthday add <date>', '/birthday remove', '/birthday info'],
+  },
+  {
+    title: 'General Command Info',
+    command: '/aura',
+    summary: 'Manage aura farming, gains, losses, and ranking.',
+    subcommands: ['/aura add <amount> [username]', '/aura farm', '/aura loss <username>', '/aura leaderboard'],
+  },
+  {
+    title: 'General Command Info',
+    command: '/ping',
+    summary: 'Check bot latency.',
+    subcommands: ['No subcommands'],
+  },
+  {
+    title: 'General Command Info',
+    command: '/hellno',
+    summary: 'Tell someone hell no.',
+    subcommands: ['No subcommands'],
+  },
+  {
+    title: 'General Command Info',
+    command: '/whoasked',
+    summary: 'Tell someone who asked?',
+    subcommands: ['No subcommands'],
+  },
+  {
+    title: 'General Command Info',
+    command: '/info',
+    summary: 'Show all slash commands with pagination.',
+    subcommands: ['No subcommands'],
+  },
+];
+
 const AURA_LEADERBOARD_PAGE_SIZE = 5;
 
 function buildInfoPage(pageIndex: number) {
@@ -121,6 +167,43 @@ function buildInfoPage(pageIndex: number) {
       .setLabel('Next ▶')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(pageIndex === BIRTHDAY_INFO_PAGES.length - 1)
+  );
+
+  return {
+    embeds: [embed],
+    components: [row],
+  };
+}
+
+function buildGeneralInfoPage(pageIndex: number) {
+  const page = GENERAL_INFO_PAGES[pageIndex];
+
+  const embed = new EmbedBuilder()
+    .setColor(0x5865f2)
+    .setTitle(`📘 ${page.title}`)
+    .addFields(
+      { name: 'Command', value: `\`${page.command}\``, inline: false },
+      { name: 'Summary', value: page.summary, inline: false },
+      { name: 'Subcommands', value: page.subcommands.join('\n'), inline: false }
+    )
+    .setFooter({ text: `Page ${pageIndex + 1} of ${GENERAL_INFO_PAGES.length}` });
+
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`general_info_prev_${pageIndex}`)
+      .setLabel('◀ Previous')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(pageIndex === 0),
+    new ButtonBuilder()
+      .setCustomId('general_info_page_indicator')
+      .setLabel(`${pageIndex + 1}/${GENERAL_INFO_PAGES.length}`)
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(true),
+    new ButtonBuilder()
+      .setCustomId(`general_info_next_${pageIndex}`)
+      .setLabel('Next ▶')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(pageIndex === GENERAL_INFO_PAGES.length - 1)
   );
 
   return {
@@ -343,6 +426,10 @@ async function registerSlashCommands(): Promise<void> {
         .setRequired(true)
     );
 
+  const infoCommand = new SlashCommandBuilder()
+    .setName('info')
+    .setDescription('Show all slash commands and their subcommands');
+
   if (!client.application) {
     throw new Error('Discord client application is not initialized yet.');
   }
@@ -353,6 +440,7 @@ async function registerSlashCommands(): Promise<void> {
     pingCommand,
     hellnoCommand,
     whoaskedCommand,
+    infoCommand,
   ]);
 }
 
@@ -428,6 +516,8 @@ client.on('interactionCreate', async (interaction) => {
     const nextMatch = /^birthday_info_next_(\d+)$/.exec(interaction.customId);
     const auraPrevMatch = /^aura_lb_prev_(\d+)$/.exec(interaction.customId);
     const auraNextMatch = /^aura_lb_next_(\d+)$/.exec(interaction.customId);
+    const generalPrevMatch = /^general_info_prev_(\d+)$/.exec(interaction.customId);
+    const generalNextMatch = /^general_info_next_(\d+)$/.exec(interaction.customId);
 
     if (prevMatch) {
       const newPage = Number(prevMatch[1]) - 1;
@@ -453,6 +543,18 @@ client.on('interactionCreate', async (interaction) => {
       return;
     }
 
+    if (generalPrevMatch) {
+      const newPage = Number(generalPrevMatch[1]) - 1;
+      await interaction.update(buildGeneralInfoPage(newPage));
+      return;
+    }
+
+    if (generalNextMatch) {
+      const newPage = Number(generalNextMatch[1]) + 1;
+      await interaction.update(buildGeneralInfoPage(newPage));
+      return;
+    }
+
     return;
   }
 
@@ -473,6 +575,11 @@ client.on('interactionCreate', async (interaction) => {
   if (interaction.commandName === 'whoasked') {
     const targetUser = interaction.options.getUser('user', true);
     await interaction.reply(`<@${targetUser.id}> - who asked?`);
+    return;
+  }
+
+  if (interaction.commandName === 'info') {
+    await interaction.reply(buildGeneralInfoPage(0));
     return;
   }
 
