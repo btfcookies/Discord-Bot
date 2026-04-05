@@ -19,6 +19,7 @@ A simple Discord bot built with Node.js and `discord.js`.
 - Node.js
 - discord.js v14
 - dotenv
+- TypeScript
 
 ## Prerequisites
 
@@ -51,7 +52,7 @@ DISCORD_TOKEN=your_discord_bot_token_here
 6. Start the bot:
 
 ```bash
-node index.js
+npm start
 ```
 
 When successful, you should see:
@@ -106,7 +107,8 @@ Current defaults in the code:
 
 ```text
 .
-├── index.js
+├── index.ts
+├── tsconfig.json
 ├── package.json
 ├── package-lock.json
 ├── birthdays.json (auto-created when first birthday is added)

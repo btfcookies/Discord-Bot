@@ -1,7 +1,22 @@
-const express = require('express');
+import express from 'express';
+import dotenv from 'dotenv';
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  Client,
+  EmbedBuilder,
+  GatewayIntentBits,
+  SlashCommandBuilder,
+} from 'discord.js';
+import fs from 'fs';
+import path from 'path';
+
+dotenv.config();
+
 const app = express();
 
-app.get('/', (req, res) => {
+app.get('/', (_req, res) => {
   res.send('Bot is alive!');
 });
 
@@ -9,18 +24,33 @@ app.listen(3000, () => {
   console.log('Web server running');
 });
 
-require('dotenv').config();
-const {
-  Client,
-  GatewayIntentBits,
-  SlashCommandBuilder,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  EmbedBuilder,
-} = require('discord.js');
-const fs = require('fs');
-const path = require('path');
+interface BirthdayInfoPage {
+  title: string;
+  command: string;
+  summary: string;
+  details: string;
+}
+
+interface BirthdayEntry {
+  userId: string;
+  guildId: string;
+  channelId: string;
+  month: number;
+  day: number;
+  originalDate: string;
+  lastSentYear: number | null;
+}
+
+interface AuraEntry {
+  userId: string;
+  Aura: number;
+}
+
+interface ParsedBirthdayDate {
+  year: number;
+  month: number;
+  day: number;
+}
 
 // Create the bot client
 const client = new Client({
@@ -32,12 +62,12 @@ const client = new Client({
 });
 
 // Map to track user message timestamps for anti-spam
-const userMessages = new Map();
+const userMessages = new Map<string, number[]>();
 
 const BIRTHDAYS_FILE = path.join(__dirname, 'birthdays.json');
 const AURA_FILE = path.join(__dirname, 'aura.json');
 
-const BIRTHDAY_INFO_PAGES = [
+const BIRTHDAY_INFO_PAGES: BirthdayInfoPage[] = [
   {
     title: 'Birthday Commands',
     command: '/birthday add <date>',
@@ -62,7 +92,7 @@ const BIRTHDAY_INFO_PAGES = [
 
 const AURA_LEADERBOARD_PAGE_SIZE = 5;
 
-function buildInfoPage(pageIndex) {
+function buildInfoPage(pageIndex: number) {
   const page = BIRTHDAY_INFO_PAGES[pageIndex];
 
   const embed = new EmbedBuilder()
@@ -75,7 +105,7 @@ function buildInfoPage(pageIndex) {
     )
     .setFooter({ text: `Page ${pageIndex + 1} of ${BIRTHDAY_INFO_PAGES.length}` });
 
-  const row = new ActionRowBuilder().addComponents(
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(`birthday_info_prev_${pageIndex}`)
       .setLabel('◀ Previous')
@@ -99,7 +129,7 @@ function buildInfoPage(pageIndex) {
   };
 }
 
-function loadBirthdays() {
+function loadBirthdays(): BirthdayEntry[] {
   if (!fs.existsSync(BIRTHDAYS_FILE)) {
     return [];
   }
@@ -107,14 +137,14 @@ function loadBirthdays() {
   try {
     const raw = fs.readFileSync(BIRTHDAYS_FILE, 'utf8');
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? (parsed as BirthdayEntry[]) : [];
   } catch (error) {
     console.error('Failed to read birthdays file:', error);
     return [];
   }
 }
 
-function loadAura() {
+function loadAura(): AuraEntry[] {
   if (!fs.existsSync(AURA_FILE)) {
     return [];
   }
@@ -122,14 +152,14 @@ function loadAura() {
   try {
     const raw = fs.readFileSync(AURA_FILE, 'utf8');
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? (parsed as AuraEntry[]) : [];
   } catch (error) {
     console.error('Failed to read aura file:', error);
     return [];
   }
 }
 
-function saveAura(aura) {
+function saveAura(aura: AuraEntry[]): void {
   try {
     fs.writeFileSync(AURA_FILE, JSON.stringify(aura, null, 2), 'utf8');
   } catch (error) {
@@ -137,7 +167,7 @@ function saveAura(aura) {
   }
 }
 
-function getSortedAuraEntries() {
+function getSortedAuraEntries(): AuraEntry[] {
   return loadAura()
     .filter(
       (entry) =>
@@ -149,7 +179,7 @@ function getSortedAuraEntries() {
     .sort((a, b) => b.Aura - a.Aura);
 }
 
-function buildAuraLeaderboardPage(pageIndex) {
+function buildAuraLeaderboardPage(pageIndex: number) {
   const sortedAura = getSortedAuraEntries();
   const totalPages = Math.max(1, Math.ceil(sortedAura.length / AURA_LEADERBOARD_PAGE_SIZE));
   const safePageIndex = Math.min(Math.max(pageIndex, 0), totalPages - 1);
@@ -173,7 +203,7 @@ function buildAuraLeaderboardPage(pageIndex) {
     .setDescription(lines)
     .setFooter({ text: `Page ${safePageIndex + 1} of ${totalPages}` });
 
-  const row = new ActionRowBuilder().addComponents(
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(`aura_lb_prev_${safePageIndex}`)
       .setLabel('◀ Previous')
@@ -197,7 +227,7 @@ function buildAuraLeaderboardPage(pageIndex) {
   };
 }
 
-function saveBirthdays(birthdays) {
+function saveBirthdays(birthdays: BirthdayEntry[]): void {
   try {
     fs.writeFileSync(BIRTHDAYS_FILE, JSON.stringify(birthdays, null, 2), 'utf8');
   } catch (error) {
@@ -205,7 +235,7 @@ function saveBirthdays(birthdays) {
   }
 }
 
-function parseBirthdayDate(input) {
+function parseBirthdayDate(input: string): ParsedBirthdayDate | null {
   const match = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(input);
   if (!match) return null;
 
@@ -226,7 +256,7 @@ function parseBirthdayDate(input) {
   return { year, month, day };
 }
 
-async function registerSlashCommands() {
+async function registerSlashCommands(): Promise<void> {
   const birthdayCommand = new SlashCommandBuilder()
     .setName('birthday')
     .setDescription('Manage birthday reminders')
@@ -291,7 +321,7 @@ async function registerSlashCommands() {
 
   const pingCommand = new SlashCommandBuilder()
     .setName('ping')
-    .setDescription('Check the bot\'s latency');
+    .setDescription("Check the bot's latency");
 
   const hellnoCommand = new SlashCommandBuilder()
     .setName('hellno')
@@ -313,6 +343,10 @@ async function registerSlashCommands() {
         .setRequired(true)
     );
 
+  if (!client.application) {
+    throw new Error('Discord client application is not initialized yet.');
+  }
+
   await client.application.commands.set([
     birthdayCommand,
     auraCommand,
@@ -322,7 +356,7 @@ async function registerSlashCommands() {
   ]);
 }
 
-async function checkBirthdaysAndSend() {
+async function checkBirthdaysAndSend(): Promise<void> {
   const birthdays = loadBirthdays();
   if (birthdays.length === 0) return;
 
@@ -343,7 +377,7 @@ async function checkBirthdaysAndSend() {
 
     try {
       const channel = await client.channels.fetch(entry.channelId);
-      if (!channel || !channel.isTextBased()) {
+      if (!channel || !channel.isTextBased() || !("send" in channel)) {
         continue;
       }
 
@@ -366,7 +400,7 @@ const SPAM_LIMIT = 3; // messages allowed in interval
 const AURA_ADD_REQUIRED_ROLE_NAME = '👑COOKIEMONSTER👑';
 
 client.once('ready', () => {
-  console.log(`Logged in as ${client.user.tag}`);
+  console.log(`Logged in as ${client.user?.tag ?? 'unknown user'}`);
 
   registerSlashCommands()
     .then(() => {
@@ -446,7 +480,7 @@ client.on('interactionCreate', async (interaction) => {
     const subcommand = interaction.options.getSubcommand();
 
     if (subcommand === 'add') {
-      if (!interaction.inGuild()) {
+      if (!interaction.guild || !interaction.guildId) {
         await interaction.reply({
           content: 'This command can only be used in a server.',
           ephemeral: true,
@@ -483,12 +517,10 @@ client.on('interactionCreate', async (interaction) => {
       const updatedEntry = aura.find((entry) => entry.userId === targetUser.id);
       const totalAura = updatedEntry ? updatedEntry.Aura : amount;
 
-      await interaction.reply(
-        {
-          content: `<@${interaction.user.id}> added ${amount} aura to <@${targetUser.id}>. Total Aura: ${totalAura}`,
-          ephemeral: true,
-        }
-      );
+      await interaction.reply({
+        content: `<@${interaction.user.id}> added ${amount} aura to <@${targetUser.id}>. Total Aura: ${totalAura}`,
+        ephemeral: true,
+      });
       return;
     }
 
@@ -568,7 +600,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   if (interaction.commandName !== 'birthday') return;
-  if (!interaction.inGuild()) {
+  if (!interaction.guild || !interaction.guildId) {
     await interaction.reply({
       content: 'This command can only be used in a server.',
       ephemeral: true,
@@ -618,9 +650,9 @@ client.on('interactionCreate', async (interaction) => {
 
   const birthdays = loadBirthdays().filter((entry) => entry.userId !== interaction.user.id);
 
-  const birthdayEntry = {
+  const birthdayEntry: BirthdayEntry = {
     userId: interaction.user.id,
-    guildId: interaction.guildId,
+    guildId: interaction.guildId ?? '',
     channelId: interaction.channelId,
     month: parsedDate.month,
     day: parsedDate.day,
