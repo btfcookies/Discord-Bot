@@ -70,6 +70,8 @@ const client = new Client({
 
 // Map to track user message timestamps for anti-spam
 const userMessages = new Map<string, number[]>();
+// Map to track spam burst events per user within the spam event window
+const userSpamEvents = new Map<string, number[]>();
 
 const BIRTHDAYS_FILE = path.join(__dirname, 'birthdays.json');
 const AURA_FILE = path.join(__dirname, 'aura.json');
@@ -339,6 +341,52 @@ function parseBirthdayDate(input: string): ParsedBirthdayDate | null {
   return { year, month, day };
 }
 
+async function findGuildMemberMentionByName(
+  guild: import('discord.js').Guild | null,
+  name: string
+): Promise<string | null> {
+  if (!guild) {
+    return null;
+  }
+
+  const normalizedName = name.trim().toLowerCase();
+  const cachedMember = guild.members.cache.find((member) => {
+    const username = member.user.username.toLowerCase();
+    const globalName = member.user.globalName?.toLowerCase();
+    const displayName = member.displayName.toLowerCase();
+
+    return (
+      username === normalizedName ||
+      globalName === normalizedName ||
+      displayName === normalizedName
+    );
+  });
+
+  if (cachedMember) {
+    return `<@${cachedMember.id}>`;
+  }
+
+  try {
+    const members = await guild.members.search({ query: name, limit: 10 });
+    const matchedMember = members.find((member) => {
+      const username = member.user.username.toLowerCase();
+      const globalName = member.user.globalName?.toLowerCase();
+      const displayName = member.displayName.toLowerCase();
+
+      return (
+        username === normalizedName ||
+        globalName === normalizedName ||
+        displayName === normalizedName
+      );
+    });
+
+    return matchedMember ? `<@${matchedMember.id}>` : null;
+  } catch (error) {
+    console.error(`Failed to find guild member for name "${name}":`, error);
+    return null;
+  }
+}
+
 async function registerSlashCommands(): Promise<void> {
   const birthdayCommand = new SlashCommandBuilder()
     .setName('birthday')
@@ -482,13 +530,20 @@ async function checkBirthdaysAndSend(): Promise<void> {
   }
 }
 
-// Anti-spam settings
-const SPAM_INTERVAL = 3000; // 3 seconds
-const SPAM_LIMIT = 3; // messages allowed in interval
+// Anti- settings
+const SPAM_INTERVAL = 3000; // 3 seconds — window for detecting a spam burst
+const SPAM_LIMIT = 3; // messages within SPAM_INTERVAL = one spam burst
+const SPAM_EVENT_INTERVAL = 120000; // 2 minutes — window for counting spam bursts
+const SPAM_EVENT_LIMIT = 3; // spam bursts within SPAM_EVENT_INTERVAL = timeout
 const AURA_ADD_REQUIRED_ROLE_NAME = '👑COOKIEMONSTER👑';
 
 client.once('ready', () => {
   console.log(`Logged in as ${client.user?.tag ?? 'unknown user'}`);
+
+  client.user?.setPresence({
+    activities: [{ name: 'buying BTF' }],
+    status: 'online',
+  });
 
   registerSlashCommands()
     .then(() => {
@@ -505,11 +560,21 @@ client.once('ready', () => {
       if (channel && channel.isTextBased() && !channel.isDMBased()) {
         const botPingRole = channel.guild.roles.cache.find(role => role.name === 'bot ping');
         if (botPingRole) {
-          channel.send(`<@&${botPingRole.id}> i have awaken <t:${Math.floor(Date.now() / 1000)}:F>`)
+          const startupEmbed = new EmbedBuilder()
+            .setColor(0x57f287)
+            .setTitle('🟢 Bot is Online')
+            .addFields(
+              { name: 'I HAVE AWAKEN', value: ' ', inline: false },
+              { name: 'Time', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false }
+            )
+            .setTimestamp()
+            .setFooter({ text: 'Notification - Bob the 2nd' });
+
+          channel.send({ content: `<@&${botPingRole.id}>`, embeds: [startupEmbed] })
             .then(() => {
               console.log('Startup message sent.');
             })
-            .catch((error) => { 
+            .catch((error) => {
               console.error('Failed to send startup message:', error);
             });
         } else {
@@ -799,7 +864,7 @@ client.on('interactionCreate', async (interaction) => {
   });
 });
 
-client.on('messageCreate', (message) => {
+client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
   // --- Anti-Spam Logic ---
@@ -810,11 +875,65 @@ client.on('messageCreate', (message) => {
   const recent = timestamps.filter((time) => now - time <= SPAM_INTERVAL);
   userMessages.set(message.author.id, recent);
 
-  if (recent.length > SPAM_LIMIT) {
-    message.reply('Hey stop spamming').catch(console.error);
+  if (recent.length >= SPAM_LIMIT) {
+    // One spam burst detected — reset message timestamps
+    userMessages.set(message.author.id, []);
+
+    // Record this burst and check if the user has hit the burst limit
+    const spamEventTimestamps = userSpamEvents.get(message.author.id) || [];
+    spamEventTimestamps.push(now);
+    const recentSpamEvents = spamEventTimestamps.filter((t) => now - t <= SPAM_EVENT_INTERVAL);
+    userSpamEvents.set(message.author.id, recentSpamEvents);
+
+    if (recentSpamEvents.length >= SPAM_EVENT_LIMIT) {
+      // 3 spam bursts in 2 minutes — timeout the user
+      userSpamEvents.set(message.author.id, []);
+
+      if (message.guild) {
+        try {
+          const member = await message.guild.members.fetch(message.author.id);
+
+          // Skip timeout for users with the exempt role
+          if (member.roles.cache.some((role) => role.name === AURA_ADD_REQUIRED_ROLE_NAME)) {
+            return;
+          }
+
+          const timeoutEmbed = new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle(`🔇 ${message.author.username} was timed out`)
+            .addFields(
+              { name: 'Reason', value: 'Spamming', inline: false },
+              { name: 'Duration', value: '5 minutes', inline: false }
+            )
+            .setTimestamp()
+            .setFooter({ text: 'Automated anti-spam system' });
+
+          if (member.moderatable) {
+            await member.timeout(5 * 60 * 1000, 'Spamming');
+          } else {
+            timeoutEmbed.setFooter({ text: 'Automated anti-spam system — could not apply timeout (insufficient permissions or higher role)' });
+          }
+
+          await message.channel.send({ embeds: [timeoutEmbed] }).catch(console.error);
+        } catch (error) {
+          console.error(`Failed to timeout user ${message.author.id}:`, error);
+        }
+      }
+      return;
+    }
   }
 
   // --- Existing Commands ---
+  if (message.content.trim() === 'Bob the 2nd, owen criticized you') {
+    const bradMention =
+      (await findGuildMemberMentionByName(message.guild, 'brad_the_lad')) ?? '@brad_the_lad';
+
+    message
+      .reply(`how dare you ${bradMention}! should i ban him?`)
+      .catch(console.error);
+    return;
+  }
+
   if (message.content === 'BTF bot does lawrence have aura') {
     message.reply('Yes, Lawrence has infinite aura!');
   }
