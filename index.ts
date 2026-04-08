@@ -547,10 +547,10 @@ client.once('ready', () => {
 
   registerSlashCommands()
     .then(() => {
-      console.log('Slash commands registered.');
+      console.log('[Discord] Slash commands registered.');
     })
     .catch((error) => {
-      console.error('Failed to register slash commands:', error);
+      console.error('[Discord] Failed to register slash commands:', error);
     });
 
   // Send startup message
@@ -572,7 +572,7 @@ client.once('ready', () => {
 
           channel.send({ content: `<@&${botPingRole.id}>`, embeds: [startupEmbed] })
             .then(() => {
-              console.log('Startup message sent.');
+              console.log(`[BOT] Startup message sent to channel ${channel.id}.`);
             })
             .catch((error) => {
               console.error('Failed to send startup message:', error);
@@ -924,6 +924,11 @@ client.on('messageCreate', async (message) => {
   }
 
   // --- Existing Commands ---
+  if (client.user && message.mentions.has(client.user)) {
+    await message.reply({ content: 'Need help? Here are my commands:', ...buildGeneralInfoPage(0) });
+    return;
+  }
+
   if (message.content.trim() === 'Bob the 2nd, owen criticized you') {
     const bradMention =
       (await findGuildMemberMentionByName(message.guild, 'brad_the_lad')) ?? '@brad_the_lad';
@@ -934,7 +939,7 @@ client.on('messageCreate', async (message) => {
     return;
   }
 
-  if (message.content === 'BTF bot does lawrence have aura') {
+  if (message.content === 'Bob the 2nd does lawrence have aura') {
     message.reply('Yes, Lawrence has infinite aura!');
   }
 });
