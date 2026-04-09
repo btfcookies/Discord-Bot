@@ -110,7 +110,7 @@ const GENERAL_INFO_PAGES: GeneralInfoPage[] = [
     title: 'General Command Info',
     command: '/aura',
     summary: 'Manage aura farming, gains, losses, and ranking.',
-    subcommands: ['/aura add <amount> [username]', '/aura farm', '/aura loss <username>', '/aura leaderboard'],
+    subcommands: ['/aura add <amount> [username]', '/aura farm', '/aura loss <username>', '/aura leaderboard', '/aura personal'],
   },
   {
     title: 'General Command Info',
@@ -448,6 +448,9 @@ async function registerSlashCommands(): Promise<void> {
     )
     .addSubcommand((subcommand) =>
       subcommand.setName('leaderboard').setDescription('Show the aura leaderboard')
+    )
+    .addSubcommand((subcommand) =>
+      subcommand.setName('personal').setDescription('Show your current aura amount')
     );
 
   const pingCommand = new SlashCommandBuilder()
@@ -791,6 +794,14 @@ client.on('interactionCreate', async (interaction) => {
       return;
     }
 
+    if (subcommand === 'personal') {
+      const aura = loadAura();
+      const entry = aura.find((e) => e.userId === interaction.user.id);
+      const amount = entry ? entry.Aura : 0;
+      await interaction.reply(`<@${interaction.user.id}> has ${amount} aura.`);
+      return;
+    }
+
     return;
   }
 
@@ -924,7 +935,7 @@ client.on('messageCreate', async (message) => {
   }
 
   // --- Existing Commands ---
-  if (client.user && message.mentions.has(client.user)) {
+  if (client.user && message.mentions.users.has(client.user.id)) {
     await message.reply({ content: 'Need help? Here are my commands:', ...buildGeneralInfoPage(0) });
     return;
   }
